@@ -1,12 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import isPromise from 'is-promise';
 import React, { useCallback, useRef } from 'react';
-import { Share, StyleSheet } from 'react-native';
+import { Platform, Share } from 'react-native';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 import { MessageType } from '../types/Communication';
 import CommunicationBridgeNativeSide from '../utils/CommunicationBridgeNativeSide';
 
-export type Keys = 'STORAGE_READ' | 'STORAGE_WRITE' | 'SHARE';
+export type Keys = 'STORAGE_READ' | 'STORAGE_WRITE' | 'SHARE' | 'LOG';
+
+const injectedJavaScript = `
+  window.nativePlatform = '${Platform.OS}';
+`;
 
 const WebappView = () => {
   const webRef = useRef<WebView>(null);
@@ -90,31 +94,22 @@ const WebappView = () => {
       ref={webRef}
       originWhitelist={['*']}
       allowFileAccess={true}
-      source={{ uri: `http://localhost:3000/` }}
+      source={{
+        uri:
+          Platform.OS === 'android'
+            ? 'http://10.0.2.2:3000/'
+            : 'http://localhost:3000/',
+      }}
       cacheEnabled
       javaScriptEnabled
       domStorageEnabled={true}
       allowUniversalAccessFromFileURLs={true}
       allowFileAccessFromFileURLs={true}
       mixedContentMode='always'
+      injectedJavaScript={injectedJavaScript}
       onMessage={onMessage}
     />
   );
 };
 
 export default WebappView;
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'green',
-  },
-  header: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  webView: {
-    padding: 20,
-  },
-});

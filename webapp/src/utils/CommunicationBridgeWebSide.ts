@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { MessageType } from '../../../types/Communication';
 
-export const isWebView = !!(window as any).ReactNativeWebView;
+export const isWebView = !!window.ReactNativeWebView;
 
 class CommunicationBridgeWebSide<K extends string, D> {
   idempotence: string;
@@ -19,39 +19,42 @@ class CommunicationBridgeWebSide<K extends string, D> {
       idempotence: this.idempotence,
     };
 
-    (isWebView
-      ? (window as any).ReactNativeWebView
-      : window.parent
-    ).postMessage(JSON.stringify(newMessage), '*');
+    window.ReactNativeWebView.postMessage(JSON.stringify(newMessage));
   }
 
   receiveMessage = <T>(): Promise<T> => {
     return new Promise((resolve, reject) => {
       const classThis = this;
-      window.addEventListener('message', function messageListener(event) {
-        const timer = setTimeout(() => {
-          clearTimeout(timer);
-          window.removeEventListener('message', messageListener);
-          reject(new Error('TIMEOUT'));
-        }, classThis.timeout);
 
-        const req: MessageType<K, T> =
-          event &&
-          event.data &&
-          typeof event.data === 'string' &&
-          JSON.parse(event.data);
+      const receiver = window.nativePlatform === 'ios' ? window : document;
 
-        if (req && req.idempotence === classThis.idempotence) {
-          clearTimeout(timer);
-          window.removeEventListener('message', messageListener);
-          if (req.error) {
-            return reject(req.error);
+      receiver.addEventListener(
+        'message',
+        function messageListener(event: any) {
+          const timer = setTimeout(() => {
+            clearTimeout(timer);
+            receiver.removeEventListener('message', messageListener);
+            reject(new Error('TIMEOUT'));
+          }, classThis.timeout);
+
+          const req: MessageType<K, T> =
+            event &&
+            event.data &&
+            typeof event.data === 'string' &&
+            JSON.parse(event.data);
+
+          if (req && req.idempotence === classThis.idempotence) {
+            clearTimeout(timer);
+            receiver.removeEventListener('message', messageListener);
+            if (req.error) {
+              return reject(req.error);
+            }
+            return resolve(req.data);
           }
-          return resolve(req.data);
         }
-      });
+      );
     });
-  }
+  };
 }
 
 export default CommunicationBridgeWebSide;
